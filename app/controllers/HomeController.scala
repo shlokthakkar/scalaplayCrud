@@ -1,7 +1,6 @@
 package controllers
 
 import Model.EmployeeVO
-import play.api.libs.functional.syntax.toFunctionalBuilderOps
 import play.api.libs.json.Format.GenericFormat
 
 import javax.inject._
@@ -14,10 +13,6 @@ import services.EmployeeService
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 
-/**
- * This controller creates an `Action` to handle HTTP requests to the
- * application's home page.
- */
 @Singleton
 class HomeController @Inject()(val controllerComponents: ControllerComponents,val employeeService: EmployeeService) extends BaseController {
 
@@ -34,19 +29,27 @@ class HomeController @Inject()(val controllerComponents: ControllerComponents,va
   }
 
   //Get all Employees
+  // Path is GET /Employee/companyName
   def getEmployee(company:String): Action[AnyContent] = Action async { implicit request: Request[AnyContent] =>
     employeeService.getEmployee(company).map {
-      result => Ok(Json.toJson(result))
+      result => if(result.isEmpty)
+        {
+          NotFound("DATA_NOT_FOUND")
+        }
+      else {
+          Ok(Json.toJson(result))
+        }
     }
 
   }
 
   //Get Employee by ID
+  // Path is GET /Employee/companyName/id
   def getEmployeeById(company:String,id :Int): Action[AnyContent] = Action async { implicit request: Request[AnyContent] =>
     employeeService.getEmployeeById(company,id).map {
       result => if(result.isEmpty)
         {
-          NotFound("Data Not Found")
+          NotFound("DATA_NOT_FOUND")
         }
       else
         {
@@ -57,6 +60,8 @@ class HomeController @Inject()(val controllerComponents: ControllerComponents,va
   }
 
   //Add Employee
+  // Path is POST /Employee
+  // add json format of employee to be added in postman
   def addEmployee(): Action[JsValue] = Action(parse.json) async { implicit request =>
 
     request.body.validate[EmployeeVO].map{
@@ -65,7 +70,7 @@ class HomeController @Inject()(val controllerComponents: ControllerComponents,va
         result => Ok(Json.toJson(result))
       }
     }.recoverTotal(
-      e => Future{Ok("Bad Request"+ e)}
+      e => Future{NotAcceptable("BAD_REQUEST")}
       )
 
   }
@@ -73,29 +78,31 @@ class HomeController @Inject()(val controllerComponents: ControllerComponents,va
 
 
   //Delete Employee
+  // Path is DELETE /Employee/id
   def deleteEmployee(id:Int): Action[AnyContent] = Action async { implicit request:Request[AnyContent] =>
 
     employeeService.deleteEmployee(id).map{
-      result => if(result==1)
-        {
-          Ok(s"Deleted id $id")
-        }
-      else
-        {
-          Ok(s"ID : $id not found")
-        }
+      case 1=> Ok("DELETED")
+      case _=> NotFound("DATA_NOT_FOUND")
     }
 
   }
 
 
   //Update the data of Employee
+  // Path is PUT /Employee/companyName/id
   def updateEmployee(company:String,id:Int): Action[JsValue] = Action(parse.json) async { implicit request =>
 
     val employee = request.body.as(EmployeeVO.reads)
     val resultObj = employeeService.update(company,id,employee)
-    val result =Await.result(resultObj,Duration.Inf)
-    Future{Ok(Json.toJson(result))}
+    val result = Await.result(resultObj,Duration.Inf)
+    if(result!=null)
+      {
+        Future{Ok(Json.toJson(result))}
+      }
+      else {
+      Future{NotFound("DATA_NOT_FOUND")}
+    }
   }
 
 }
